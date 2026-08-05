@@ -1,0 +1,20 @@
+{
+  "appId": "com.mydashboard.app",
+  "appName": "个人全能工作台",
+  "webDir": "dist",
+  "server": {
+    "cleartext": true,
+    "androidScheme": "https"
+  },
+  "plugins": {
+    "LocalNotifications": {
+      "smallIcon": "ic_stat_notification",
+      "iconColor": "#9BB5A3"
+    },
+    "SplashScreen": {
+      "launchShowDuration": 2000,
+      "backgroundColor": "#F5F3EE",
+      "showSpinner": false
+    }
+  }
+}

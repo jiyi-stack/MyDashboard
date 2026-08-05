@@ -1,0 +1,34 @@
+/* ========================================
+   CSS Custom Properties & Reset
+   ======================================== */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#F5F3EE; --surface:#FFFFFF; --sidebar-bg:#3D3D3D;
+  --primary:#9BB5A3; --primary-deep:#7D9B87; --primary-light:#E8F0EA;
+  --accent:#D4A9A6; --accent-deep:#C0908D; --accent-light:#F8ECEB;
+  --secondary:#8BA5B5; --secondary-deep:#6E8D9E; --secondary-light:#E8F0F4;
+  --amber:#E8C8A0; --amber-deep:#D4B088; --amber-light:#FBF3E8;
+  --danger:#C9A0A0; --danger-light:#F5EAEA;
+  --text:#3D3D3D; --text-secondary:#8C8C8C; --text-light:#B0B0B0;
+  --border:#E8E5DE; --border-light:#F0EEE9;
+  --shadow-sm:0 1px 3px rgba(0,0,0,0.04); --shadow:0 2px 12px rgba(0,0,0,0.06);
+  --shadow-md:0 4px 20px rgba(0,0,0,0.08); --shadow-lg:0 8px 40px rgba(0,0,0,0.12);
+  --radius-sm:8px; --radius:12px; --radius-lg:16px; --radius-xl:20px;
+  --sidebar-w:240px; --tab-h:64px; --header-h:56px;
+  --transition:0.25s cubic-bezier(0.4,0,0.2,1);
+  --transition-slow:0.45s cubic-bezier(0.4,0,0.2,1);
+}
+html{font-size:16px;scroll-behavior:smooth}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei","Noto Sans SC",sans-serif;
+  background:var(--bg);color:var(--text);line-height:1.6;
+  min-height:100vh;min-height:100dvh;overflow:hidden;
+  -webkit-tap-highlight-color:transparent;
+}
+input,textarea,select,button{font-family:inherit;font-size:inherit;color:inherit}
+button{cursor:pointer;border:none;background:none;outline:none}
+input,textarea,select{outline:none;border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 14px;width:100%;background:var(--surface);transition:border var(--transition)}
+input:focus,textarea:focus,select:focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(155,181,163,0.15)}
+a{color:var(--primary-deep);text-decoration:none}
+img{max-width:100%}
+::-webkit-scrollbar{width:5px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:#D0CDC4;border-radius:10px}

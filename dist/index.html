@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>个人全能工作台</title>
+  <script type="module" crossorigin src="/assets/index-CrfXNS2g.js"></script>
+  <link rel="stylesheet" crossorigin href="/assets/index-B8Aq-g36.css">
+</head>
+<body>
+  <div class="app" id="app">
+    <!-- Sidebar Overlay (mobile) -->
+    <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+    <!-- Desktop Sidebar -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-brand">
+        <div class="sidebar-brand-icon">✦</div>
+        <h1>全能工作台</h1>
+      </div>
+      <nav class="sidebar-nav" id="sidebarNav">
+        <button class="sidebar-nav-item active" data-view="dashboard">
+          <span class="icon">📊</span> 数据看板
+        </button>
+        <button class="sidebar-nav-item" data-view="plans">
+          <span class="icon">📋</span> 计划清单
+        </button>
+        <button class="sidebar-nav-item" data-view="autotasks">
+          <span class="icon">⏰</span> 定时任务
+        </button>
+        <button class="sidebar-nav-item" data-view="learning">
+          <span class="icon">📖</span> 学习记录
+        </button>
+        <button class="sidebar-nav-item" data-view="habits">
+          <span class="icon">🌱</span> 习惯追踪
+        </button>
+        <button class="sidebar-nav-item" data-view="finance">
+          <span class="icon">💰</span> 记账账本
+        </button>
+        <div class="sidebar-nav-divider"></div>
+        <button class="sidebar-nav-item" data-view="settings">
+          <span class="icon">⚙️</span> 设置中心
+        </button>
+      </nav>
+    </aside>
+
+    <!-- Main Content Area -->
+    <main class="main">
+      <div class="main-header" id="mainHeader">
+        <button class="btn btn-icon btn-ghost" id="menuBtn" aria-label="菜单" style="display:none">☰</button>
+        <div>
+          <div class="main-header-title" id="headerTitle">数据看板</div>
+          <div class="main-header-subtitle" id="headerSub"></div>
+        </div>
+        <div style="flex:1"></div>
+        <button class="btn btn-primary btn-sm" id="headerAction" style="display:none">＋ 新增</button>
+      </div>
+      <div class="main-content" id="mainContent"></div>
+    </main>
+
+    <!-- Mobile Bottom Navigation -->
+    <nav class="mobile-nav" id="mobileNav">
+      <div class="mobile-nav-inner">
+        <button class="mobile-nav-item active" data-view="dashboard">
+          <span class="icon">📊</span>看板
+        </button>
+        <button class="mobile-nav-item" data-view="plans">
+          <span class="icon">📋</span>计划
+        </button>
+        <button class="mobile-nav-item" data-view="autotasks">
+          <span class="icon">⏰</span>任务
+        </button>
+        <button class="mobile-nav-item" data-view="learning">
+          <span class="icon">📖</span>学习
+        </button>
+        <button class="mobile-nav-item" data-view="habits">
+          <span class="icon">🌱</span>习惯
+        </button>
+      </div>
+    </nav>
+  </div>
+
+  <!-- Toast Container -->
+  <div class="toast-container" id="toastContainer"></div>
+  <!-- Particles Container -->
+  <div class="particles-container" id="particlesContainer"></div>
+</body>
+</html>
