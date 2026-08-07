@@ -1,0 +1,43 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Server database (local data, not source)
+server/data.db
+server/data.db-shm
+server/data.db-wal
+server/*.backup.*
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Android
+android/local.properties
+android/app/build/
+android/build/
+android/capacitor-cordova-android-plugins/build/
+android/.gradle/
+android/captures/
+android/*.apk
+android/*.aab
+
+# iOS
+ios/App/Pods/
+ios/App/build/
+ios/App/*.xcworkspace
+ios/App/*.xcodeproj/xcuserdata/
+
+# Capacitor
+android/app/src/main/assets/public/
+
+# Claude
+.claude/

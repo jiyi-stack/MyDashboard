@@ -67,12 +67,52 @@ function loadDataLocal() {
   try {
     const d = localStorage.getItem(STORAGE_KEY);
     if (d) {
-      try { return JSON.parse(d); } catch (e2) { /* corrupt data — use default */ }
+      try {
+        const parsed = JSON.parse(d);
+        // 数据完整性校验：必须有5个模块的数组
+        const requiredKeys = ['plans', 'autotasks', 'learning', 'habits', 'finance'];
+        const valid = requiredKeys.every(k => Array.isArray(parsed[k]));
+        if (valid) {
+          return parsed;
+        }
+        console.warn('本地数据结构异常，回退到默认数据');
+      } catch (e2) { console.warn('本地数据JSON解析失败，回退到默认数据'); }
     }
     return JSON.parse(JSON.stringify(defaultData));
   } catch (e) { return JSON.parse(JSON.stringify(defaultData)); }
 }
-function saveDataLocal(data) { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); }
+function saveDataLocal(data) {
+  try {
+    const json = JSON.stringify(data);
+    localStorage.setItem(STORAGE_KEY, json);
+    return true;
+  } catch (e) {
+    console.error('保存数据失败:', e.message);
+    // 如果是配额错误，尝试清理旧删除记录
+    if (e.name === 'QuotaExceededError') {
+      console.warn('localStorage 配额不足，尝试清理已删除记录...');
+      // 清理30天前的软删除记录
+      const cutoff = new Date();
+      cutoff.setDate(cutoff.getDate() - 30);
+      const cutoffStr = cutoff.toISOString();
+      for (const key of ['plans', 'autotasks', 'learning', 'habits', 'finance']) {
+        data[key] = data[key].filter(item => {
+          if (!item.deleted) return true;
+          return (item.updatedAt || item.createdAt || '') > cutoffStr;
+        });
+      }
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+        console.warn('清理后保存成功');
+        return true;
+      } catch (e2) {
+        console.error('清理后仍保存失败:', e2.message);
+        return false;
+      }
+    }
+    return false;
+  }
+}
 function loadSettingsLocal() {
   try { const s = localStorage.getItem(SETTINGS_KEY); return s ? JSON.parse(s) : { ...defaultSettings }; }
   catch (e) { return { ...defaultSettings }; }
@@ -160,11 +200,18 @@ function mergeAllData(serverData) {
 }
 
 async function initData() {
+  // 定期清理30天前的软删除记录
+  cleanupOldDeleted();
+
   const serverData = await apiFetch('/sync');
-  if (serverData && serverData.plans) {
+  // 检查服务器是否有实际数据（不仅是空数组）
+  const hasServerData = serverData && Object.values(serverData).some(
+    arr => Array.isArray(arr) && arr.length > 0
+  );
+  if (hasServerData) {
     mergeAllData(serverData);
     const pushResult = await apiFetch('/sync', { method: 'POST', body: JSON.stringify(appData) });
-    if (pushResult && pushResult.plans) {
+    if (pushResult && Object.values(pushResult).some(arr => Array.isArray(arr) && arr.length > 0)) {
       mergeAllData(pushResult);
     }
     saveDataLocal(appData);
@@ -172,12 +219,39 @@ async function initData() {
     clearPendingChanges();
     return 'synced';
   }
+  // 服务器无数据，仅保存本地
+  saveDataLocal(appData);
   return 'offline';
+}
+
+// 清理30天前的软删除记录
+function cleanupOldDeleted() {
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - 30);
+  const cutoffStr = cutoff.toISOString();
+  let cleaned = 0;
+  for (const key of ['plans', 'autotasks', 'learning', 'habits', 'finance']) {
+    const before = appData[key].length;
+    appData[key] = appData[key].filter(item => {
+      if (!item.deleted) return true;
+      const time = (item.updatedAt || item.createdAt || '');
+      if (time > cutoffStr) return true; // 保留30天内的删除
+      cleaned++;
+      return false; // 永久删除
+    });
+  }
+  if (cleaned > 0) console.log(`[cleanup] 清理了 ${cleaned} 条过期删除记录`);
 }
 
 // ── 保存：写本地 + 尝试推服务器 + 记录离线变更 ──
 function saveAll() {
-  saveDataLocal(appData);
+  const saved = saveDataLocal(appData);
+  if (!saved) {
+    // 保存失败时通过全局事件通知 UI
+    if (typeof window !== 'undefined' && window.dispatchEvent) {
+      window.dispatchEvent(new CustomEvent('save-failed', { detail: { reason: 'localStorage 写入失败，可能是存储空间不足' } }));
+    }
+  }
   apiFetch('/sync', {
     method: 'POST',
     body: JSON.stringify(appData),

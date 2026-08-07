@@ -8,7 +8,7 @@ android {
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
-        versionName "1.0"
+        versionName "1.0.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -51,4 +51,14 @@ try {
     }
 } catch(Exception e) {
     logger.info("google-services.json not found, google-services plugin not applied. Push Notifications won't work")
+}
+
+// ── 输出 APK 自动重命名为 HDAllinOneWorkbench_v{ver}_{variant}_{timestamp}.apk ──
+android.applicationVariants.all { variant ->
+    variant.outputs.all { output ->
+        def versionName = variant.versionName
+        def variantName = variant.name // Debug / Release
+        def timestamp = new Date().format("yyyyMMddHHmm", TimeZone.getTimeZone("Asia/Shanghai"))
+        output.outputFileName = "HDAllinOneWorkbench_v${versionName}_${variantName}_${timestamp}.apk"
+    }
 }

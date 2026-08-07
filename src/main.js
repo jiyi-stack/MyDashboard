@@ -231,6 +231,11 @@ async function init() {
   console.log('Sync result:', syncStatus);
   showToast(syncStatus === 'synced' ? '已从服务器同步数据' : '离线模式 · 数据保存在本地', 'info', syncStatus === 'synced' ? 'cloud' : 'smartphone');
 
+  // 监听 localStorage 保存失败事件
+  window.addEventListener('save-failed', (e) => {
+    showToast('数据保存失败！存储空间可能不足，请导出数据备份后清理旧记录', 'warning');
+  });
+
   // Capacitor（后台加载，不阻塞）
   setTimeout(() => {
     import('@capacitor/local-notifications').then(mod => {
