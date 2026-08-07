@@ -1,34 +1,98 @@
-/* ========================================
-   CSS Custom Properties & Reset
-   ======================================== */
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
-  --bg:#F5F3EE; --surface:#FFFFFF; --sidebar-bg:#3D3D3D;
-  --primary:#9BB5A3; --primary-deep:#7D9B87; --primary-light:#E8F0EA;
-  --accent:#D4A9A6; --accent-deep:#C0908D; --accent-light:#F8ECEB;
-  --secondary:#8BA5B5; --secondary-deep:#6E8D9E; --secondary-light:#E8F0F4;
-  --amber:#E8C8A0; --amber-deep:#D4B088; --amber-light:#FBF3E8;
-  --danger:#C9A0A0; --danger-light:#F5EAEA;
-  --text:#3D3D3D; --text-secondary:#8C8C8C; --text-light:#B0B0B0;
-  --border:#E8E5DE; --border-light:#F0EEE9;
-  --shadow-sm:0 1px 3px rgba(0,0,0,0.04); --shadow:0 2px 12px rgba(0,0,0,0.06);
-  --shadow-md:0 4px 20px rgba(0,0,0,0.08); --shadow-lg:0 8px 40px rgba(0,0,0,0.12);
-  --radius-sm:8px; --radius:12px; --radius-lg:16px; --radius-xl:20px;
-  --sidebar-w:240px; --tab-h:64px; --header-h:56px;
+  --bg:#F5F7FB;
+  --bg-2:#F8FAFC;
+  --surface:#FFFFFF;
+  --surface-secondary:#F1F5F9;
+  --sidebar-bg:rgba(255,255,255,0.9);
+  --sidebar-bg-solid:#FFFFFF;
+
+  --primary:#2563EB;
+  --primary-deep:#1D4ED8;
+  --primary-light:rgba(37,99,235,0.1);
+
+  --accent:#7C3AED;
+  --accent-deep:#6D28D9;
+  --accent-light:rgba(124,58,237,0.1);
+
+  --secondary:#0EA5E9;
+  --secondary-deep:#0284C7;
+  --secondary-light:rgba(14,165,233,0.1);
+
+  --success:#10B981;
+  --success-deep:#059669;
+  --success-light:rgba(16,185,129,0.1);
+
+  --warning:#F59E0B;
+  --warning-deep:#D97706;
+  --warning-light:rgba(245,158,11,0.1);
+
+  --danger:#EF4444;
+  --danger-deep:#DC2626;
+  --danger-light:rgba(239,68,68,0.1);
+
+  --amber:#FBBF24;
+  --amber-deep:#F59E0B;
+  --amber-light:rgba(251,191,36,0.15);
+
+  --pink:#EC4899;
+  --pink-light:rgba(236,72,153,0.1);
+
+  --gradient-primary:linear-gradient(135deg,#3B82F6 0%,#6366F1 50%,#8B5CF6 100%);
+  --gradient-accent:linear-gradient(135deg,#8B5CF6 0%,#A855F7 100%);
+  --gradient-success:linear-gradient(135deg,#10B981 0%,#34D399 100%);
+  --gradient-warning:linear-gradient(135deg,#F59E0B 0%,#FBBF24 100%);
+  --gradient-danger:linear-gradient(135deg,#EF4444 0%,#F87171 100%);
+
+  --text:#0F172A;
+  --text-secondary:#64748B;
+  --text-tertiary:#94A3B8;
+
+  --border:#E2E8F0;
+  --border-light:#F1F5F9;
+
+  --shadow-xs:0 1px 2px rgba(15,23,42,0.04);
+  --shadow-sm:0 2px 8px rgba(15,23,42,0.04);
+  --shadow:0 4px 16px rgba(15,23,42,0.06);
+  --shadow-md:0 8px 24px rgba(15,23,42,0.08);
+  --shadow-lg:0 16px 48px rgba(15,23,42,0.1);
+  --shadow-glass:0 8px 32px rgba(15,23,42,0.06);
+
+  --radius-xs:6px;
+  --radius-sm:8px;
+  --radius:12px;
+  --radius-lg:16px;
+  --radius-xl:20px;
+  --radius-2xl:24px;
+
+  --sidebar-w:240px;
+  --tab-h:68px;
+  --header-h:64px;
+
   --transition:0.25s cubic-bezier(0.4,0,0.2,1);
-  --transition-slow:0.45s cubic-bezier(0.4,0,0.2,1);
+  --transition-slow:0.4s cubic-bezier(0.4,0,0.2,1);
+  --transition-spring:0.5s cubic-bezier(0.34,1.56,0.64,1);
+
+  --blur:20px;
 }
 html{font-size:16px;scroll-behavior:smooth}
 body{
-  font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei","Noto Sans SC",sans-serif;
+  font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","PingFang SC","Microsoft YaHei","Noto Sans SC",sans-serif;
   background:var(--bg);color:var(--text);line-height:1.6;
   min-height:100vh;min-height:100dvh;overflow:hidden;
   -webkit-tap-highlight-color:transparent;
+  font-feature-settings:"ss01","cv11";
 }
 input,textarea,select,button{font-family:inherit;font-size:inherit;color:inherit}
-button{cursor:pointer;border:none;background:none;outline:none}
-input,textarea,select{outline:none;border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 14px;width:100%;background:var(--surface);transition:border var(--transition)}
-input:focus,textarea:focus,select:focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(155,181,163,0.15)}
-a{color:var(--primary-deep);text-decoration:none}
+button{cursor:pointer;border:none;background:none;outline:none;-webkit-tap-highlight-color:transparent}
+input,textarea,select{outline:none;border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 14px;width:100%;background:var(--surface);transition:all var(--transition)}
+input:focus,textarea:focus,select:focus{border-color:var(--primary);box-shadow:0 0 0 4px var(--primary-light);background:#fff}
+a{color:var(--primary);text-decoration:none}
 img{max-width:100%}
-::-webkit-scrollbar{width:5px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:#D0CDC4;border-radius:10px}
+
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:#D1D1D6;border-radius:10px}
+::-webkit-scrollbar-thumb:hover{background:#C0C0C5}
+
+::selection{background:var(--primary-light);color:var(--primary-deep)}

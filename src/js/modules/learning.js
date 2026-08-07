@@ -1,37 +1,134 @@
-// ========================================
-// 学习记录模块
-// ========================================
-import { uid, fmtDate, getToday, getNow, monthMatch, escHtml, getMonths, monthLabel } from '../utils.js';
-import { showModal, showConfirm, showToast, showEncourage } from '../ui-framework.js';
+import { uid, fmtDate, getToday, getNow, monthMatch, escHtml, getMonths, monthLabel, initSwipeActions } from '../utils.js';
+import { showModal, showConfirm, showToast, showEncourage, createCustomSelect } from '../ui-framework.js';
+import { iconHTML } from '../icons.js';
 
 export function renderLearning(container, appData, saveAll, currentMonth) {
-  let records = [...appData.learning];
+  let records = appData.learning.filter(l => !l.deleted);
   if (currentMonth) records = records.filter(l => monthMatch(l.studyTime, currentMonth));
   records.sort((a, b) => (b.studyTime||'').localeCompare(a.studyTime||'') || (b.createdAt||'').localeCompare(a.createdAt||''));
+  const totalCount = appData.learning.filter(l => !l.deleted).length;
+  const monthCount = records.length;
 
   container.innerHTML = `
-    <div class="page-title">学习记录</div>
-    <div class="page-subtitle">记录每一次成长 · 共 ${appData.learning.length} 条</div>
-    <div class="filter-bar"><select id="learnMonthFilter"><option value="">全部时间</option>${getMonths().map(m => `<option value="${m}" ${m===currentMonth?'selected':''}>${monthLabel(m)}</option>`).join('')}</select></div>
-    <div class="stat-grid" style="margin-bottom:16px">
-      <div class="stat-card"><div class="stat-card-label">本月学习</div><div class="stat-card-value">${records.length}</div><div class="stat-card-sub">次记录</div></div>
-      <div class="stat-card"><div class="stat-card-label">总计学习</div><div class="stat-card-value">${appData.learning.length}</div><div class="stat-card-sub">条记录</div></div></div>
-    <div class="list" id="learnList"></div>`;
+    <div class="learning-page-header">
+      <div class="learning-title">学习记录</div>
+      <div class="learning-subtitle">记录每一次成长 · 共 ${totalCount} 条</div>
+    </div>
 
-  document.getElementById('learnMonthFilter').onchange = function() { window._filterLearnMonth(this.value); };
+    <div class="learning-stats-row">
+      <div class="learning-stat-card blue">
+        <div class="learning-stat-icon blue">
+          ${iconHTML('book-open', { color: '#fff', size: 24 })}
+        </div>
+        <div class="learning-stat-info">
+          <div class="learning-stat-label">本月学习</div>
+          <div class="learning-stat-value">${monthCount}<span class="learning-stat-sub">次学习记录</span></div>
+        </div>
+      </div>
+      <div class="learning-stat-card purple">
+        <div class="learning-stat-icon purple">
+          ${iconHTML('graduation-cap', { color: '#fff', size: 24 })}
+        </div>
+        <div class="learning-stat-info">
+          <div class="learning-stat-label">累计学习</div>
+          <div class="learning-stat-value">${totalCount}<span class="learning-stat-sub">条记录</span></div>
+        </div>
+      </div>
+      <div class="learning-stat-card green">
+        <div class="learning-stat-icon green">
+          ${iconHTML('award', { color: '#fff', size: 24 })}
+        </div>
+        <div class="learning-stat-info">
+          <div class="learning-stat-label">连续学习</div>
+          <div class="learning-stat-value">${Math.min(monthCount, 7)} <span class="learning-stat-rate">天</span><span class="learning-stat-sub">继续加油</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="learning-toolbar">
+      <button class="btn btn-outline btn-sm" onclick="window._openLearningModal()">
+        ${iconHTML('plus', { size: 16 })} 新增
+      </button>
+      <div style="flex:1"></div>
+      <div class="learning-filter-bar">
+        <div id="learnMonthFilter"></div>
+      </div>
+    </div>
+
+    <div id="learnList"></div>`;
+
+  const monthItems = [{ value: '', label: '全部时间' }, ...getMonths().map(m => ({ value: m, label: monthLabel(m) }))];
+  const monthSelect = createCustomSelect({
+    id: 'learnMonthSelect',
+    value: currentMonth || '',
+    items: monthItems,
+    size: 'sm',
+    variant: 'text',
+    align: 'right',
+    onChange: (val) => { window._filterLearnMonth(val); }
+  });
+  document.getElementById('learnMonthFilter').appendChild(monthSelect.el);
+
   renderLearnList(records);
 }
 
 function renderLearnList(records) {
   const list = document.getElementById('learnList');
   if (!list) return;
-  if (!records.length) { list.innerHTML = `<div class="empty-state"><div class="empty-state-icon">📖</div><div class="empty-state-text">暂无学习记录</div><div class="empty-state-hint">记录你的学习过程，见证每一天的成长</div></div>`; return; }
+  if (!records.length) { 
+    list.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-state-icon">${iconHTML('book-open', { size: 48 })}</div>
+        <div class="empty-state-text">暂无学习记录</div>
+        <div class="empty-state-hint">记录你的学习过程，见证每一天的成长</div>
+      </div>`; 
+    return; 
+  }
   list.innerHTML = records.map(r => `
-    <div class="card" style="cursor:pointer" onclick="window._openLearningModal('${r.id}')">
-      <div style="font-size:15px;font-weight:600;margin-bottom:4px">${escHtml(r.topic)}</div>
-      <div style="font-size:13px;color:var(--text-secondary);margin-bottom:6px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">${escHtml((r.content||'').slice(0,150))}</div>
-      ${r.images&&r.images.length?`<div style="display:flex;gap:6px;margin-bottom:8px">${r.images.slice(0,3).map(img => `<img src="${img}" style="width:60px;height:60px;border-radius:var(--radius-sm);object-fit:cover">`).join('')}${r.images.length>3?`<span style="font-size:12px;color:var(--text-light);align-self:center">+${r.images.length-3}</span>`:''}</div>`:''}
-      <div style="font-size:12px;color:var(--text-light);display:flex;gap:12px"><span>📅 ${r.studyTime}</span>${r.result?`<span>🏆 ${escHtml(r.result)}</span>`:''}</div></div>`).join('');
+    <div class="swipe-wrap" data-id="${r.id}">
+      <div class="swipe-actions">
+        <div class="swipe-action-btn edit">
+          ${iconHTML('edit', { color: '#fff', size: 20 })}
+        </div>
+        <div class="swipe-action-btn delete">
+          ${iconHTML('trash', { color: '#fff', size: 20 })}
+        </div>
+      </div>
+      <div class="swipe-card learning-card">
+        <div class="learning-card-icon">
+          ${iconHTML('book-open', { color: '#fff', size: 22 })}
+        </div>
+        <div class="learning-card-content">
+          <div class="learning-card-title">${escHtml(r.topic)}</div>
+          <div class="learning-card-desc">${escHtml((r.content||'').slice(0,100))}</div>
+          ${r.images&&r.images.length?`
+          <div class="learning-card-images">
+            ${r.images.slice(0,3).map(img => `<img src="${img}" class="learning-card-img">`).join('')}
+            ${r.images.length>3?`<span class="learning-card-more">+${r.images.length-3}</span>`:''}
+          </div>`:''}
+          <div class="learning-card-meta">
+            <span class="learning-meta-item">
+              ${iconHTML('calendar', { size: 12 })}
+              ${r.studyTime}
+            </span>
+            ${r.result?`
+            <span class="learning-meta-item">
+              ${iconHTML('award', { size: 12 })}
+              ${escHtml(r.result)}
+            </span>`:''}
+          </div>
+        </div>
+        <div class="learning-card-arrow">
+          ${iconHTML('chevron-right', { size: 18, color: 'var(--text-tertiary)' })}
+        </div>
+      </div>
+    </div>`).join('');
+
+  initSwipeActions(list, {
+    onEdit: (id) => window._openLearningModal(id),
+    onDelete: (id) => window._deleteLearning(id),
+    onClick: (id) => window._openLearningModal(id)
+  });
 }
 
 export function openLearningModal(editId, appData, saveAll, renderFn) {
@@ -39,19 +136,49 @@ export function openLearningModal(editId, appData, saveAll, renderFn) {
   let imgDataUrls = record && record.images ? [...record.images] : [];
 
   let contentHtml = `
-    <div class="form-group"><label class="form-label">学习主题 *</label><input id="lTopic" value="${record?escHtml(record.topic):''}" placeholder="今天学了什么？"></div>
-    <div class="form-group"><label class="form-label">学习内容</label><textarea id="lContent" rows="4" placeholder="详细描述你的学习内容...">${record?escHtml(record.content||''):''}</textarea></div>
-    <div class="form-group"><label class="form-label">学习成果</label><input id="lResult" value="${record?escHtml(record.result||''):''}" placeholder="有什么收获？"></div>
-    <div class="form-row"><div class="form-group"><label class="form-label">学习时间</label><input type="date" id="lTime" value="${record?record.studyTime:getToday()}"></div>
-    <div class="form-group"><label class="form-label">备注</label><input id="lNote" value="${record?escHtml(record.note||''):''}" placeholder="备注"></div></div>
-    <div class="form-group"><label class="form-label">配图</label><div class="img-upload-area" id="imgUploadArea">🖼️ 点击或拖拽上传图片</div>
-    <input type="file" id="imgInput" accept="image/*" multiple style="display:none"><div class="img-preview" id="imgPreview"></div></div>`;
+    <div class="form-group">
+      <label class="form-label">学习主题 *</label>
+      <input id="lTopic" value="${record?escHtml(record.topic):''}" placeholder="今天学了什么？">
+    </div>
+    <div class="form-group">
+      <label class="form-label">学习内容</label>
+      <textarea id="lContent" rows="4" placeholder="详细描述你的学习内容...">${record?escHtml(record.content||''):''}</textarea>
+    </div>
+    <div class="form-group">
+      <label class="form-label">学习成果</label>
+      <input id="lResult" value="${record?escHtml(record.result||''):''}" placeholder="有什么收获？">
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">学习时间</label>
+        <input type="date" id="lTime" value="${record?record.studyTime:getToday()}">
+      </div>
+      <div class="form-group">
+        <label class="form-label">备注</label>
+        <input id="lNote" value="${record?escHtml(record.note||''):''}" placeholder="备注">
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">配图</label>
+      <div class="img-upload-area" id="imgUploadArea">
+        ${iconHTML('image', { size: 24 })} 点击或拖拽上传图片
+      </div>
+      <input type="file" id="imgInput" accept="image/*" multiple style="display:none">
+      <div class="img-preview" id="imgPreview"></div>
+    </div>`;
 
-  const modal = showModal(record?'编辑学习记录':'新增学习记录', contentHtml + `<div class="modal-footer"><button class="btn btn-ghost cancel-btn">取消</button><button class="btn btn-primary save-btn">保存</button></div>`);
+  const modal = showModal(record?'编辑学习记录':'新增学习记录', contentHtml + `
+    <div class="modal-footer">
+      <button class="btn btn-ghost cancel-btn">取消</button>
+      <button class="btn btn-primary save-btn">保存</button>
+    </div>`);
 
   function refreshPreviews() {
     modal.getEl('#imgPreview').innerHTML = imgDataUrls.map((url, i) => `
-      <div class="img-preview-item"><img src="${url}"><button class="img-remove" onclick="event.stopPropagation();window._removeLearnImg(${i})">×</button></div>`).join('');
+      <div class="img-preview-item">
+        <img src="${url}">
+        <button class="img-remove" onclick="event.stopPropagation();window._removeLearnImg(${i})">×</button>
+      </div>`).join('');
   }
   refreshPreviews();
 
@@ -77,12 +204,25 @@ export function openLearningModal(editId, appData, saveAll, renderFn) {
       result: modal.getEl('#lResult').value.trim(),
       studyTime: modal.getEl('#lTime').value,
       note: modal.getEl('#lNote').value.trim(),
-      images: imgDataUrls,
-      createdAt: record ? record.createdAt : getNow()
+      images: [...imgDataUrls],
+      createdAt: record ? record.createdAt : getNow(),
+      updatedAt: getNow()
     };
     if (record) { appData.learning[appData.learning.findIndex(l => l.id === editId)] = data; }
     else { appData.learning.unshift(data); }
     saveAll(); modal.close(); renderFn();
-    showEncourage('learn');
+    showToast('学习记录已保存', 'success');
+    showEncourage();
   };
+}
+
+export function deleteLearning(id, appData, saveAll, renderFn) {
+  showConfirm('删除记录', '确定要删除这条学习记录吗？此操作不可撤销。', () => {
+    const idx = appData.learning.findIndex(l => l.id === id);
+    if (idx >= 0) {
+      appData.learning[idx].deleted = true;
+      appData.learning[idx].updatedAt = new Date().toISOString();
+    }
+    saveAll(); renderFn(); showToast('学习记录已删除', 'info');
+  });
 }

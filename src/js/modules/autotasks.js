@@ -1,41 +1,145 @@
-// ========================================
-// 自动化定时任务模块
-// ========================================
-import { uid, fmtDate, getToday, getNow, monthMatch, escHtml, getMonths, monthLabel, getStatusTag, getEncourage } from '../utils.js';
-import { showModal, showConfirm, showToast, showEncourage, burstParticles } from '../ui-framework.js';
+import { uid, fmtDate, getToday, getNow, monthMatch, escHtml, getMonths, monthLabel, getStatusTag, getEncourage, initSwipeActions } from '../utils.js';
+import { showModal, showConfirm, showToast, showEncourage, burstParticles, showTaskReminder, createCustomSelect } from '../ui-framework.js';
+import { iconHTML } from '../icons.js';
 
-export function renderAutoTasks(container, appData, saveAll, currentMonth) {
-  const tasks = [...appData.autotasks];
-  const monthFilter = currentMonth;
+const taskColors = ['purple', 'green', 'blue', 'orange', 'red', 'pink'];
+const taskIcons = ['users', 'briefcase', 'droplets', 'file-text', 'sprout', 'coffee'];
 
-  container.innerHTML = `
-    <div class="page-title">定时任务</div>
-    <div class="page-subtitle">自动化日常事务管控 · 共 ${tasks.length} 项</div>
-    <div class="filter-bar">
-      <select id="taskStatusFilter">
-        <option value="全部">全部状态</option><option value="未完成">未完成</option><option value="已完成">已完成</option><option value="即将开始">即将开始</option></select>
-      <select id="taskMonthFilter"><option value="">全部时间</option>${getMonths().map(m => `<option value="${m}" ${m===monthFilter?'selected':''}>${monthLabel(m)}</option>`).join('')}</select>
-    </div>
-    <div class="stat-grid" style="margin-bottom:16px">
-      <div class="stat-card"><div class="stat-card-label">本月打卡次数</div><div class="stat-card-value">${tasks.reduce((s,t) => s + (t.completedDates||[]).filter(d => monthMatch(d, monthFilter)).length, 0)}</div></div>
-      <div class="stat-card"><div class="stat-card-label">任务总数 / 完成率</div><div class="stat-card-value">${tasks.length} / ${tasks.length?Math.round(tasks.filter(t => t.status==='已完成').length/tasks.length*100):0}%</div></div>
-    </div>
-    <div class="list" id="taskList"></div>`;
-
-  document.getElementById('taskStatusFilter').onchange = function() { container.dataset.taskFilter = this.value; window._renderCurrentView(); };
-  document.getElementById('taskMonthFilter').onchange = function() { window._filterTasksMonth(this.value); };
-  renderTaskList(tasks, appData, saveAll, container, currentMonth);
+function getTaskColor(idx) {
+  return taskColors[idx % taskColors.length];
 }
 
-function getTaskScheduleLabel(t) {
+function getTaskIcon(idx) {
+  return taskIcons[idx % taskIcons.length];
+}
+
+function getRepeatLabel(t) {
   switch (t.scheduleType) {
-    case 'daily': return `每天 ${t.scheduleTime}`;
-    case 'weekday': return `工作日 ${t.scheduleTime}`;
-    case 'interval': return `每${t.scheduleDays}天 ${t.scheduleTime}`;
-    case 'monthly': return `每月${t.scheduleDate}日 ${t.scheduleTime}`;
-    case 'once': return `一次性 · ${t.scheduleDate} ${t.scheduleTime}`;
-    default: return t.scheduleTime;
+    case 'daily': return '每天';
+    case 'weekday': return '工作日';
+    case 'interval': return `每${t.scheduleDays}天`;
+    case 'monthly': return `每月${t.scheduleDate}日`;
+    case 'once': return '一次性';
+    default: return '每天';
   }
+}
+
+export function renderAutoTasks(container, appData, saveAll, currentMonth) {
+  const tasks = appData.autotasks.filter(t => !t.deleted);
+  const monthFilter = currentMonth;
+  const today = getToday();
+  
+  const todayTasks = tasks.filter(t => {
+    const doneToday = (t.completedDates || []).includes(today);
+    if (doneToday) return false;
+    if (t.scheduleType === 'daily') return true;
+    if (t.scheduleType === 'weekday') {
+      const day = new Date().getDay();
+      return day >= 1 && day <= 5;
+    }
+    if (t.scheduleType === 'once') return t.scheduleDate === today;
+    return true;
+  }).length;
+
+  const doneThisMonth = tasks.reduce((s, t) => s + (t.completedDates || []).filter(d => monthMatch(d, monthFilter)).length, 0);
+  const totalTasks = tasks.length;
+  const doneRate = totalTasks ? Math.round(tasks.filter(t => t.status === '已完成').length / totalTasks * 100) : 0;
+
+  container.innerHTML = `
+    <div class="task-page-header">
+      <div class="task-header-left">
+        <div class="task-title">定时任务</div>
+        <div class="task-subtitle">自动化管理你的日常任务 · 共 ${totalTasks} 个</div>
+      </div>
+    </div>
+
+    <div class="task-stats-row">
+      <div class="task-stat-card">
+        <div class="task-stat-icon primary">
+          ${iconHTML('clock', { color: '#fff', size: 24 })}
+        </div>
+        <div class="task-stat-info">
+          <div class="task-stat-label">今日待办</div>
+          <div class="task-stat-value">${todayTasks}</div>
+        </div>
+      </div>
+      <div class="task-stat-card">
+        <div class="task-stat-icon success">
+          ${iconHTML('check-circle', { color: '#fff', size: 24 })}
+        </div>
+        <div class="task-stat-info">
+          <div class="task-stat-label">本月完成</div>
+          <div class="task-stat-value">${doneThisMonth}</div>
+        </div>
+      </div>
+      <div class="task-stat-card">
+        <div class="task-stat-icon warning">
+          ${iconHTML('target', { color: '#fff', size: 24 })}
+        </div>
+        <div class="task-stat-info">
+          <div class="task-stat-label">完成率</div>
+          <div class="task-stat-value">${doneRate}%</div>
+        </div>
+        <div class="task-stat-progress">
+          <div class="progress-bar-sm">
+            <div class="progress-bar-fill success" style="width:${doneRate}%"></div>
+          </div>
+        </div>
+      </div>
+      <div class="task-stat-card">
+        <div class="task-stat-icon accent">
+          ${iconHTML('list-todo', { color: '#fff', size: 24 })}
+        </div>
+        <div class="task-stat-info">
+          <div class="task-stat-label">任务总数</div>
+          <div class="task-stat-value">${totalTasks}</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="task-toolbar">
+      <button class="btn btn-outline btn-sm" onclick="window._openAutoTaskModal()">
+        ${iconHTML('plus', { size: 16 })} 新增
+      </button>
+      <div style="flex:1"></div>
+      <div class="task-filters">
+        <div id="taskStatusFilter"></div>
+        <div id="taskMonthFilter"></div>
+      </div>
+    </div>
+
+    <div id="taskList"></div>`;
+
+  const statusItems = [
+    { value: '全部', label: '全部状态' },
+    { value: '未完成', label: '未完成' },
+    { value: '已完成', label: '已完成' },
+    { value: '即将开始', label: '即将开始' },
+  ];
+  const statusSelect = createCustomSelect({
+    id: 'taskStatusSelect',
+    value: container.dataset.taskFilter || '全部',
+    items: statusItems,
+    size: 'sm',
+    variant: 'text',
+    align: 'right',
+    onChange: (val) => { container.dataset.taskFilter = val; window._renderCurrentView(); }
+  });
+  document.getElementById('taskStatusFilter').appendChild(statusSelect.el);
+
+  const monthItems = [{ value: '', label: '全部时间' }, ...getMonths().map(m => ({ value: m, label: monthLabel(m) }))];
+  const monthSelect = createCustomSelect({
+    id: 'taskMonthSelect',
+    value: monthFilter || '',
+    items: monthItems,
+    size: 'sm',
+    variant: 'text',
+    align: 'right',
+    onChange: (val) => { window._filterTasksMonth(val); }
+  });
+  document.getElementById('taskMonthFilter').appendChild(monthSelect.el);
+
+  renderTaskList(tasks, appData, saveAll, container, currentMonth);
 }
 
 function renderTaskList(tasks, appData, saveAll, container, currentMonth) {
@@ -43,28 +147,69 @@ function renderTaskList(tasks, appData, saveAll, container, currentMonth) {
   if (!list) return;
   const filterStatus = container.dataset.taskFilter || '全部';
   let filtered = filterStatus === '全部' ? tasks : tasks.filter(t => t.status === filterStatus);
-  if (!filtered.length) { list.innerHTML = `<div class="empty-state"><div class="empty-state-icon">⏰</div><div class="empty-state-text">暂无任务</div><div class="empty-state-hint">新增一个定时任务开始自动化管理吧</div></div>`; return; }
+  // 已关闭（enabled=false）的任务排到列表最底部，其余保持原顺序
+  filtered = [...filtered].sort((a, b) => (a.enabled === false ? 1 : 0) - (b.enabled === false ? 1 : 0));
+  if (!filtered.length) { 
+    list.innerHTML = `<div class="empty-state"><div class="empty-state-icon">⏰</div><div class="empty-state-text">暂无任务</div><div class="empty-state-hint">新增一个定时任务开始自动化管理吧</div></div>`; 
+    return; 
+  }
 
   const today = getToday();
-  list.innerHTML = filtered.map(t => {
+  list.innerHTML = filtered.map((t, idx) => {
     const doneToday = (t.completedDates || []).includes(today);
-    const isRecurring = t.scheduleType !== 'once';
+    const color = getTaskColor(idx);
+    const icon = getTaskIcon(idx);
+    
     return `
-    <div class="card" style="display:flex;align-items:flex-start;gap:14px">
-      <div style="flex:1;min-width:0">
-        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px">
-          <span style="font-size:15px;font-weight:600">${escHtml(t.name)}</span>${getStatusTag(doneToday?'已完成':t.status)}
-          <span style="font-size:11px;color:var(--text-light)">${isRecurring?'🔄 周期':'📌 一次性'}</span></div>
-        ${t.description?`<div style="font-size:13px;color:var(--text-secondary);margin-bottom:6px">${escHtml(t.description)}</div>`:''}
-        <div style="font-size:12px;color:var(--text-light);display:flex;gap:12px;flex-wrap:wrap">
-          <span>⏰ ${getTaskScheduleLabel(t)}</span>
-          <span>本月打卡 ${(t.completedDates||[]).filter(d => monthMatch(d, currentMonth)).length} 次</span></div></div>
-      <div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0;align-items:center">
-        <button class="btn ${doneToday?'btn-primary':'btn-outline'} btn-sm" style="min-width:60px" onclick="window._checkinTask('${t.id}')">${doneToday?'✅ 已打卡':'打卡'}</button>
-        <div style="display:flex;gap:4px">
-          <button class="btn btn-ghost btn-sm" onclick="window._openAutoTaskModal('${t.id}')">✏️</button>
-          <button class="btn btn-ghost btn-sm" style="color:var(--danger)" onclick="window._deleteAutoTask('${t.id}')">🗑</button></div></div></div>`;
+    <div class="swipe-wrap" data-id="${t.id}">
+      <div class="swipe-actions">
+        <div class="swipe-action-btn edit">
+          ${iconHTML('edit', { color: '#fff', size: 20 })}
+        </div>
+        <div class="swipe-action-btn delete">
+          ${iconHTML('trash', { color: '#fff', size: 20 })}
+        </div>
+      </div>
+      <div class="swipe-card task-card">
+        <div class="task-icon ${color}">
+          ${iconHTML(icon, { color: '#fff', size: 26 })}
+        </div>
+        <div class="task-info">
+          <div class="task-name">
+            ${escHtml(t.name)}
+            ${getStatusTag(doneToday?'已完成':t.status)}
+          </div>
+          <div class="task-meta">
+            <span class="task-meta-item">
+              ${iconHTML('clock', { size: 14, color: 'currentColor' })}
+              时间: ${t.scheduleTime}
+            </span>
+            <span class="task-meta-item">
+              ${iconHTML('repeat', { size: 14, color: 'currentColor' })}
+              重复: ${getRepeatLabel(t)}
+            </span>
+          </div>
+        </div>
+        <div class="task-actions">
+          <div class="task-action-row">
+            <button class="btn btn-ghost btn-icon task-execute-btn" onclick="window._checkinTask('${t.id}')">
+              ${iconHTML('play', { size: 16 })}
+              <span class="task-action-label">立即执行</span>
+            </button>
+            <div class="task-action-toggle">
+              <span class="task-action-label">${t.enabled!==false?'关闭任务':'开启任务'}</span>
+              <div class="toggle ${t.enabled!==false?'on':''}" onclick="window._toggleTaskEnabled('${t.id}')"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>`;
   }).join('');
+
+  initSwipeActions(list, {
+    onEdit: (id) => window._openAutoTaskModal(id),
+    onDelete: (id) => window._deleteAutoTask(id)
+  });
 }
 
 export function checkinTask(id, appData, saveAll, renderFn) {
@@ -78,6 +223,14 @@ export function checkinTask(id, appData, saveAll, renderFn) {
   saveAll(); renderFn();
   burstParticles(window.innerWidth/2, window.innerHeight*0.4, 12);
   showEncourage('done');
+}
+
+export function toggleTaskEnabled(id, appData, saveAll, renderFn) {
+  const task = appData.autotasks.find(t => t.id === id);
+  if (!task) return;
+  task.enabled = task.enabled === false ? true : false;
+  saveAll(); renderFn();
+  showToast(task.enabled ? '已开启提醒' : '已关闭提醒', 'info');
 }
 
 export function openAutoTaskModal(editId, appData, saveAll, renderFn) {
@@ -116,7 +269,9 @@ export function openAutoTaskModal(editId, appData, saveAll, renderFn) {
       scheduleDate: stype==='monthly' ? (modal.getEl('#atDate')?.value || '1') : stype==='once' ? (modal.getEl('#atOnceDate')?.value || getToday()) : '',
       status: task ? task.status : '未完成',
       completedDates: task ? (task.completedDates || []) : [],
-      createdAt: task ? task.createdAt : getNow()
+      enabled: task ? (task.enabled !== false) : true,
+      createdAt: task ? task.createdAt : getNow(),
+      updatedAt: getNow()
     };
     if (task) { appData.autotasks[appData.autotasks.findIndex(t => t.id === editId)] = data; }
     else { appData.autotasks.push(data); }
@@ -127,12 +282,15 @@ export function openAutoTaskModal(editId, appData, saveAll, renderFn) {
 
 export function deleteAutoTask(id, appData, saveAll, renderFn) {
   showConfirm('删除任务', '确定要删除这个定时任务吗？', () => {
-    appData.autotasks = appData.autotasks.filter(t => t.id !== id);
+    const idx = appData.autotasks.findIndex(t => t.id === id);
+    if (idx >= 0) {
+      appData.autotasks[idx].deleted = true;
+      appData.autotasks[idx].updatedAt = new Date().toISOString();
+    }
     saveAll(); renderFn(); showToast('任务已删除', 'info');
   });
 }
 
-// ── Task scheduler check ──
 export function checkDueTasks(appData, appSettings, saveAll, renderFn, showToastFn, LocalNotifications) {
   if (!appSettings.notifications) return [];
   const now = new Date();
@@ -144,6 +302,7 @@ export function checkDueTasks(appData, appSettings, saveAll, renderFn, showToast
   const dueTasks = [];
 
   appData.autotasks.forEach(task => {
+    if (task.enabled === false) return;
     if (!task.completedDates) task.completedDates = [];
     if (task.completedDates.includes(today)) return;
     let due = false;
@@ -173,9 +332,8 @@ export function checkDueTasks(appData, appSettings, saveAll, renderFn, showToast
     saveAll();
     if (renderFn) renderFn();
     dueTasks.forEach(t => {
-      if (showToastFn) showToastFn(`⏰ 任务提醒：${t.name}`, 'warning', '🔔');
+      showTaskReminder(t);
     });
-    // Send native system notification via Capacitor (works in background / lock screen)
     if (LocalNotifications) {
       dueTasks.forEach(async (t, i) => {
         try {
@@ -190,7 +348,7 @@ export function checkDueTasks(appData, appSettings, saveAll, renderFn, showToast
               iconColor: '#9BB5A3',
               channelId: 'task-reminders',
               channelName: '定时任务提醒',
-              importance: 4, // HIGH — shows as heads-up notification
+              importance: 4,
             }]
           });
         } catch (e) {

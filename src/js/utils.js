@@ -51,3 +51,172 @@ export const FINANCE_CATEGORIES = {
   收入:['工资','奖金','兼职','投资','其他收入'],
   支出:['餐饮','交通','购物','住房','娱乐','医疗','教育','其他支出']
 };
+
+// ========================================
+// SWIPE — generic swipe-to-reveal actions (编辑/删除)
+// 卡片结构需为：.swipe-wrap > (.swipe-actions > .swipe-action-btn[data-action]) + .swipe-card
+// ========================================
+export function initSwipeActions(container, {
+  actionWidth = 144,
+  dragThreshold = 6,
+  onEdit = null,
+  onDelete = null,
+  onClick = null
+} = {}) {
+  const wraps = Array.from(container.querySelectorAll('.swipe-wrap'));
+  let activeWrap = null;
+
+  function closeAll() {
+    wraps.forEach(w => {
+      const card = w.querySelector('.swipe-card');
+      if (card && card.classList.contains('swiped')) {
+        card.classList.remove('swiped');
+        card.style.transform = '';
+      }
+    });
+    activeWrap = null;
+  }
+
+  wraps.forEach(wrap => {
+    const card = wrap.querySelector('.swipe-card');
+    if (!card) return;
+    const id = wrap.dataset.id;
+    const editBtn = wrap.querySelector('.swipe-action-btn[data-action="edit"]');
+    const deleteBtn = wrap.querySelector('.swipe-action-btn[data-action="delete"]');
+    const isInteractive = (t) => t.closest('button, a, .toggle, .dropdown, .star-mini');
+
+    if (editBtn) editBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      closeAll();
+      if (onEdit) onEdit(id, wrap, e);
+    });
+    if (deleteBtn) deleteBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      closeAll();
+      if (onDelete) onDelete(id, wrap, e);
+    });
+
+    let startX = 0, currentX = 0, touchDragging = false, mouseDragging = false, preventClick = false;
+
+    // ── Touch ──
+    card.addEventListener('touchstart', (e) => {
+      if (isInteractive(e.target)) return;
+      startX = e.touches[0].clientX;
+      currentX = startX;
+      touchDragging = false;
+      card.style.transition = 'none';
+    }, { passive: true });
+
+    card.addEventListener('touchmove', (e) => {
+      currentX = e.touches[0].clientX;
+      const delta = currentX - startX;
+      if (Math.abs(delta) > dragThreshold) { touchDragging = true; preventClick = true; }
+      if (touchDragging) {
+        if (activeWrap && activeWrap !== wrap) {
+          const ac = activeWrap.querySelector('.swipe-card');
+          ac.classList.remove('swiped');
+          ac.style.transform = '';
+        }
+        let translateX = delta;
+        if (card.classList.contains('swiped')) translateX = -actionWidth + delta;
+        if (translateX > 0) translateX = 0;
+        if (translateX < -actionWidth - 20) translateX = -actionWidth - 20;
+        card.style.transform = `translateX(${translateX}px)`;
+      }
+    }, { passive: true });
+
+    card.addEventListener('touchend', () => {
+      card.style.transition = '';
+      if (!touchDragging) return;
+      const delta = currentX - startX;
+      let offset = delta;
+      if (card.classList.contains('swiped')) offset = -actionWidth + delta;
+      if (offset < -actionWidth / 3) {
+        card.classList.add('swiped');
+        card.style.transform = '';
+        activeWrap = wrap;
+      } else {
+        card.classList.remove('swiped');
+        card.style.transform = '';
+        if (activeWrap === wrap) activeWrap = null;
+      }
+      touchDragging = false;
+      setTimeout(() => { preventClick = false; }, 300);
+    });
+
+    // ── Mouse ──
+    let mouseStartX = 0, mouseCurrentX = 0;
+    card.addEventListener('mousedown', (e) => {
+      if (e.button !== 0 || isInteractive(e.target)) return;
+      mouseStartX = e.clientX;
+      mouseCurrentX = mouseStartX;
+      mouseDragging = false;
+      card.style.transition = 'none';
+      card.style.cursor = 'grabbing';
+
+      const onMove = (ev) => {
+        mouseCurrentX = ev.clientX;
+        const delta = mouseCurrentX - mouseStartX;
+        if (Math.abs(delta) > dragThreshold) { mouseDragging = true; preventClick = true; }
+        if (mouseDragging) {
+          if (activeWrap && activeWrap !== wrap) {
+            const ac = activeWrap.querySelector('.swipe-card');
+            ac.classList.remove('swiped');
+            ac.style.transform = '';
+          }
+          let translateX = delta;
+          if (card.classList.contains('swiped')) translateX = -actionWidth + delta;
+          if (translateX > 0) translateX = 0;
+          if (translateX < -actionWidth - 20) translateX = -actionWidth - 20;
+          card.style.transform = `translateX(${translateX}px)`;
+        }
+      };
+      const onUp = () => {
+        card.style.transition = '';
+        card.style.cursor = '';
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('mouseup', onUp);
+        if (!mouseDragging) return;
+        const delta = mouseCurrentX - mouseStartX;
+        let offset = delta;
+        if (card.classList.contains('swiped')) offset = -actionWidth + delta;
+        if (offset < -actionWidth / 3) {
+          card.classList.add('swiped');
+          card.style.transform = '';
+          activeWrap = wrap;
+        } else {
+          card.classList.remove('swiped');
+          card.style.transform = '';
+          if (activeWrap === wrap) activeWrap = null;
+        }
+        mouseDragging = false;
+        setTimeout(() => { preventClick = false; }, 300);
+      };
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onUp);
+    });
+
+    card.addEventListener('click', (e) => {
+      if (preventClick) {
+        e.preventDefault();
+        e.stopPropagation();
+        preventClick = false;
+        return;
+      }
+      if (card.classList.contains('swiped')) {
+        e.preventDefault();
+        e.stopPropagation();
+        closeAll();
+      } else if (onClick) {
+        onClick(id, wrap, e);
+      }
+    });
+  });
+
+  document.addEventListener('touchstart', (e) => {
+    if (!e.target.closest('.swipe-wrap')) closeAll();
+  }, { passive: true });
+  document.addEventListener('mousedown', (e) => {
+    if (!e.target.closest('.swipe-wrap')) closeAll();
+  });
+}

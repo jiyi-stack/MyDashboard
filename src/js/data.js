@@ -8,8 +8,32 @@ const SETTINGS_KEY = 'mydashboard_settings';
 const LAST_SYNC_KEY = 'mydashboard_last_sync';
 // 记录离线期间修改过的条目 ID（以便回家后只推送变化的部分）
 const PENDING_CHANGES_KEY = 'mydashboard_pending_changes';
+// 电脑端服务器地址配置 key（APK 里可自定义填写，如 192.168.1.100:3001）
+const SERVER_URL_KEY = 'mydashboard_server_url';
 
-const API_BASE = (typeof import.meta !== 'undefined' && import.meta.env?.DEV) ? '/api' : (window.location.origin + '/api');
+// 服务器 API 基地址：
+// 1) 若在设置中心配置过服务器地址（APK/局域网），优先使用
+// 2) 浏览器开发模式走 vite 代理 /api
+// 3) 其余（浏览器生产部署）走同源 /api
+function getServerBase() {
+  try {
+    const cfg = localStorage.getItem(SERVER_URL_KEY);
+    if (cfg) {
+      const { url } = JSON.parse(cfg);
+      if (url) {
+        const base = String(url).trim().replace(/\/+$/, '');
+        if (base) return base.endsWith('/api') ? base : base + '/api';
+      }
+    }
+  } catch (e) { /* 配置损坏时回退默认 */ }
+  return (typeof import.meta !== 'undefined' && import.meta.env?.DEV) ? '/api' : (window.location.origin + '/api');
+}
+
+function setServerUrl(url) {
+  const val = String(url || '').trim();
+  if (val) localStorage.setItem(SERVER_URL_KEY, JSON.stringify({ url: val }));
+  else localStorage.removeItem(SERVER_URL_KEY);
+}
 
 // Default seed data
 const defaultData = {
@@ -33,11 +57,7 @@ const defaultData = {
     { id:'h1', name:'每日阅读', type:'正向', rating:4, record:'坚持每天阅读30分钟', note:'继续保持', createdAt:'2026-08-01', updatedAt:'2026-08-01' },
     { id:'h2', name:'熬夜', type:'负面', rating:2, record:'最近有所改善，但偶尔还是会熬夜', note:'目标是完全戒掉', createdAt:'2026-08-01', updatedAt:'2026-08-01' }
   ],
-  finance: [
-    { id:'f1', type:'支出', category:'餐饮', amount:35, date:'2026-08-03', scene:'午餐外卖', note:'', image:'', createdAt:'2026-08-03', updatedAt:'2026-08-03' },
-    { id:'f2', type:'支出', category:'交通', amount:12, date:'2026-08-03', scene:'地铁通勤', note:'', image:'', createdAt:'2026-08-03', updatedAt:'2026-08-03' },
-    { id:'f3', type:'收入', category:'工资', amount:15000, date:'2026-08-01', scene:'8月工资', note:'', image:'', createdAt:'2026-08-01', updatedAt:'2026-08-01' }
-  ]
+  finance: []
 };
 
 const defaultSettings = { notifications:true, theme:'light', autoSync:true, reminderVolume:70 };
@@ -82,7 +102,7 @@ function setLastSyncTime() {
 
 // ── API helpers ──
 async function apiFetch(path, options = {}) {
-  const url = API_BASE + path;
+  const url = getServerBase() + path;
   try {
     const res = await fetch(url, {
       headers: { 'Content-Type': 'application/json' },
@@ -100,30 +120,35 @@ async function apiFetch(path, options = {}) {
 let appData = loadDataLocal();
 let appSettings = loadSettingsLocal();
 
-// ── 智能合并：以 updatedAt 为准，谁新用谁的 ──
+// ── 智能合并：以 updatedAt 为准，谁新用谁的；支持软删除 ──
 function smartMerge(localItems, serverItems) {
-  const merged = {};
-  // 本地数据优先建立 map
-  for (const item of localItems) {
-    merged[item.id] = item;
+  const serverMap = {};
+  for (const item of serverItems) {
+    serverMap[item.id] = item;
   }
-  // 服务器数据对比：如果服务器的更新，就用服务器的
-  for (const serverItem of serverItems) {
-    const localItem = merged[serverItem.id];
-    if (!localItem) {
-      // 服务器有、本地没有 → 新增
-      merged[serverItem.id] = serverItem;
+  const merged = [];
+
+  for (const lItem of localItems) {
+    const sItem = serverMap[lItem.id];
+    if (sItem) {
+      const localTime = lItem.updatedAt || lItem.createdAt || '';
+      const serverTime = sItem.updatedAt || sItem.createdAt || '';
+      merged.push(serverTime > localTime ? sItem : lItem);
     } else {
-      // 两边都有 → 比时间戳
-      const localTime = localItem.updatedAt || localItem.createdAt || '';
-      const serverTime = serverItem.updatedAt || serverItem.createdAt || '';
-      if (serverTime > localTime) {
-        merged[serverItem.id] = serverItem;
-      }
-      // 否则保留本地（本地更新）
+      merged.push(lItem);
     }
   }
-  return Object.values(merged);
+
+  for (const sItem of serverItems) {
+    if (!merged.find(m => m.id === sItem.id)) {
+      merged.push(sItem);
+    }
+  }
+  return merged;
+}
+
+function filterDeleted(items) {
+  return items.filter(item => !item.deleted);
 }
 
 function mergeAllData(serverData) {
@@ -135,29 +160,18 @@ function mergeAllData(serverData) {
 }
 
 async function initData() {
-  // 1. 尝试连接服务器
   const serverData = await apiFetch('/sync');
   if (serverData && serverData.plans) {
-    // 2. 服务器可达 → 先推送本地离线期间有变化的条目，再智能合并
-    const pending = getPendingChanges();
-    const hasPending = Object.keys(pending).some(k => Object.keys(pending[k] || {}).length > 0);
-    if (hasPending) {
-      // 把完整本地数据推上去（服务器用 INSERT OR REPLACE，不会丢数据）
-      await apiFetch('/sync', { method: 'POST', body: JSON.stringify(appData) });
-      clearPendingChanges();
-    }
-    // 3. 拉取服务器最新数据做智能合并
-    const freshServerData = await apiFetch('/sync');
-    if (freshServerData && freshServerData.plans) {
-      mergeAllData(freshServerData);
-    } else {
-      mergeAllData(serverData);
+    mergeAllData(serverData);
+    const pushResult = await apiFetch('/sync', { method: 'POST', body: JSON.stringify(appData) });
+    if (pushResult && pushResult.plans) {
+      mergeAllData(pushResult);
     }
     saveDataLocal(appData);
     setLastSyncTime();
+    clearPendingChanges();
     return 'synced';
   }
-  // 4. 服务器不可达 → 纯离线模式，记录后续修改
   return 'offline';
 }
 
@@ -222,5 +236,5 @@ export {
   apiFetch, initData, saveAll, normalizeData,
   markItemUpdated, fullPushToServer, fullPullFromServer,
   getLastSyncTime, setLastSyncTime,
-  STORAGE_KEY, SETTINGS_KEY, API_BASE
+  STORAGE_KEY, SETTINGS_KEY, SERVER_URL_KEY, getServerBase, setServerUrl
 };
